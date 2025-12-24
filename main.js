@@ -13,25 +13,21 @@ const camera = new THREE.PerspectiveCamera(
 );
 
 /* ================= RENDERER ================= */
-const renderer = new THREE.WebGLRenderer({
-  canvas: canvas,
-  antialias: true
-});
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(window.devicePixelRatio);
 
 /* ================= LIGHT ================= */
-const light = new THREE.DirectionalLight(0xffffff, 1);
-light.position.set(5, 10, 5);
-scene.add(light);
+const sun = new THREE.DirectionalLight(0xffffff, 1);
+sun.position.set(5, 10, 5);
+scene.add(sun);
 
-/* ================= ROAD (ENDLESS SEGMENTS) ================= */
-const roadSegments = [];
+/* ================= ROAD ================= */
 const ROAD_WIDTH = 5;
 const ROAD_LENGTH = 120;
-const ROAD_COUNT = 3;
+const roadSegments = [];
 
-for (let i = 0; i < ROAD_COUNT; i++) {
+for (let i = 0; i < 3; i++) {
   const road = new THREE.Mesh(
     new THREE.BoxGeometry(ROAD_WIDTH, 0.1, ROAD_LENGTH),
     new THREE.MeshStandardMaterial({ color: 0x333333 })
@@ -40,48 +36,6 @@ for (let i = 0; i < ROAD_COUNT; i++) {
   scene.add(road);
   roadSegments.push(road);
 }
-
-/* ================= WATER ================= */
-const waterMaterial = new THREE.MeshBasicMaterial({
-  color: 0x1e90ff,
-  transparent: true,
-  opacity: 0.7
-});
-
-const water = new THREE.Mesh(
-  new THREE.PlaneGeometry(80, 300),
-  waterMaterial
-);
-water.rotation.x = -Math.PI / 2;
-water.position.y = -0.2;
-water.position.z = -150;
-scene.add(water);
-
-/* ================= BRIDGE ================= */
-const bridge = new THREE.Mesh(
-  new THREE.BoxGeometry(ROAD_WIDTH, 0.15, 30),
-  new THREE.MeshStandardMaterial({ color: 0x555555 })
-);
-bridge.position.set(0, 0.3, -60);
-scene.add(bridge);
-
-/* ================= SLOPE UP ================= */
-const upRoad = new THREE.Mesh(
-  new THREE.BoxGeometry(ROAD_WIDTH, 0.15, 30),
-  new THREE.MeshStandardMaterial({ color: 0x444444 })
-);
-upRoad.position.set(0, 1.5, -110);
-upRoad.rotation.x = -0.25;
-scene.add(upRoad);
-
-/* ================= SLOPE DOWN ================= */
-const downRoad = new THREE.Mesh(
-  new THREE.BoxGeometry(ROAD_WIDTH, 0.15, 30),
-  new THREE.MeshStandardMaterial({ color: 0x444444 })
-);
-downRoad.position.set(0, 0.2, -150);
-downRoad.rotation.x = 0.25;
-scene.add(downRoad);
 
 /* ================= CAR ================= */
 const car = new THREE.Mesh(
@@ -95,68 +49,120 @@ scene.add(car);
 camera.position.set(0, 3, 6);
 camera.lookAt(car.position);
 
-/* ================= CONTROL VARIABLES ================= */
+/* ================= ENVIRONMENT GROUP ================= */
+const envGroup = new THREE.Group();
+scene.add(envGroup);
+
+/* ================= ENVIRONMENT CREATOR ================= */
+function createEnvironment(type, zPos) {
+  const group = new THREE.Group();
+
+  if (type === "grass") {
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(80, 120),
+      new THREE.MeshBasicMaterial({ color: 0x2e8b57 })
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.z = zPos;
+    group.add(ground);
+  }
+
+  if (type === "water") {
+    const water = new THREE.Mesh(
+      new THREE.PlaneGeometry(80, 120),
+      new THREE.MeshBasicMaterial({ color: 0x1e90ff, transparent: true, opacity: 0.8 })
+    );
+    water.rotation.x = -Math.PI / 2;
+    water.position.y = -0.2;
+    water.position.z = zPos;
+    group.add(water);
+  }
+
+  if (type === "jungle") {
+    for (let i = 0; i < 15; i++) {
+      const tree = new THREE.Mesh(
+        new THREE.ConeGeometry(0.7, 2, 6),
+        new THREE.MeshStandardMaterial({ color: 0x006400 })
+      );
+      tree.position.set(
+        (Math.random() > 0.5 ? 1 : -1) * (3 + Math.random() * 5),
+        1,
+        zPos - Math.random() * 100
+      );
+      group.add(tree);
+    }
+  }
+
+  if (type === "houses") {
+    for (let i = 0; i < 8; i++) {
+      const house = new THREE.Mesh(
+        new THREE.BoxGeometry(1.5, 1.5, 1.5),
+        new THREE.MeshStandardMaterial({ color: 0xb5651d })
+      );
+      house.position.set(
+        (Math.random() > 0.5 ? 1 : -1) * (4 + Math.random() * 4),
+        0.75,
+        zPos - Math.random() * 100
+      );
+      group.add(house);
+    }
+  }
+
+  return group;
+}
+
+/* ================= ENVIRONMENT SETUP ================= */
+const envTypes = ["grass", "jungle", "houses", "water"];
+const envSegments = [];
+
+for (let i = 0; i < 4; i++) {
+  const env = createEnvironment(envTypes[i], -i * 120);
+  env.position.z = -i * 120;
+  envGroup.add(env);
+  envSegments.push(env);
+}
+
+/* ================= CONTROLS ================= */
 let isPressing = false;
 let targetX = 0;
-let speed = 0;
 
-/* ================= POINTER (TOUCH) CONTROLS ================= */
 canvas.addEventListener("pointerdown", () => {
   isPressing = true;
-  speed = 0.22;
 });
-
 canvas.addEventListener("pointerup", () => {
   isPressing = false;
-  speed = 0;
 });
-
-canvas.addEventListener("pointermove", (e) => {
+canvas.addEventListener("pointermove", e => {
   if (!isPressing) return;
   targetX = (e.clientX / window.innerWidth - 0.5) * 4;
 });
-
-/* ================= WATER COLOR ANIMATION ================= */
-let waterHue = 0.55;
 
 /* ================= ANIMATION LOOP ================= */
 function animate() {
   requestAnimationFrame(animate);
 
-  /* ---- Left / Right ---- */
+  /* Move */
   car.position.x += (targetX - car.position.x) * 0.12;
-
-  /* ---- Road Boundary (Water me jaane se roke) ---- */
   if (car.position.x > 2) car.position.x = 2;
   if (car.position.x < -2) car.position.x = -2;
 
-  /* ---- Forward (ONLY when pressing) ---- */
-  if (isPressing) {
-    car.position.z -= speed;
-  }
+  if (isPressing) car.position.z -= 0.25;
 
-  /* ---- Slope Height Logic ---- */
-  if (car.position.z < -100 && car.position.z > -130) {
-    car.position.y = 0.5 + (-car.position.z - 100) * 0.03;
-  } else if (car.position.z <= -130 && car.position.z > -160) {
-    car.position.y = 1.4 - (-car.position.z - 130) * 0.03;
-  } else {
-    car.position.y = 0.5;
-  }
-
-  /* ---- Endless Road Reposition ---- */
+  /* Road Loop */
   roadSegments.forEach(r => {
     if (r.position.z - car.position.z > ROAD_LENGTH) {
       r.position.z -= ROAD_LENGTH * roadSegments.length;
     }
   });
 
-  /* ---- Water Color Slow Change ---- */
-  waterHue += 0.0002;
-  if (waterHue > 0.75) waterHue = 0.55;
-  water.material.color.setHSL(waterHue, 0.6, 0.5);
+  /* Environment Loop */
+  envSegments.forEach((env, i) => {
+    if (env.position.z - car.position.z > 120) {
+      env.position.z -= 120 * envSegments.length;
+    }
+  });
 
-  /* ---- Camera Follow ---- */
+  /* Camera Follow */
   camera.position.z = car.position.z + 6;
   camera.position.x += (car.position.x - camera.position.x) * 0.05;
   camera.lookAt(car.position);
