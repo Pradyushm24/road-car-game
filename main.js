@@ -1,9 +1,10 @@
 const canvas = document.getElementById("game");
 
+// ===== SCENE =====
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87ceeb);
 
-// Camera
+// ===== CAMERA =====
 const camera = new THREE.PerspectiveCamera(
   75,
   window.innerWidth / window.innerHeight,
@@ -11,26 +12,30 @@ const camera = new THREE.PerspectiveCamera(
   1000
 );
 
-// Renderer
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+// ===== RENDERER =====
+const renderer = new THREE.WebGLRenderer({
+  canvas: canvas,
+  antialias: true
+});
 renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(window.devicePixelRatio);
 
-// Light
+// ===== LIGHT =====
 const light = new THREE.DirectionalLight(0xffffff, 1);
 light.position.set(5, 10, 5);
 scene.add(light);
 
 // ===== ROAD =====
 const road = new THREE.Mesh(
-  new THREE.BoxGeometry(5, 0.1, 120),
+  new THREE.BoxGeometry(5, 0.1, 140),
   new THREE.MeshStandardMaterial({ color: 0x333333 })
 );
-road.position.z = -60;
+road.position.z = -70;
 scene.add(road);
 
 // ===== WATER =====
 const water = new THREE.Mesh(
-  new THREE.PlaneGeometry(60, 200),
+  new THREE.PlaneGeometry(80, 200),
   new THREE.MeshBasicMaterial({
     color: 0x1e90ff,
     transparent: true,
@@ -47,7 +52,7 @@ const bridge = new THREE.Mesh(
   new THREE.BoxGeometry(5, 0.15, 30),
   new THREE.MeshStandardMaterial({ color: 0x555555 })
 );
-bridge.position.set(0, 0.3, -70);
+bridge.position.set(0, 0.3, -60);
 scene.add(bridge);
 
 // ===== SLOPE UP =====
@@ -73,29 +78,48 @@ const car = new THREE.Mesh(
   new THREE.BoxGeometry(1, 0.5, 2),
   new THREE.MeshStandardMaterial({ color: 0xff0000 })
 );
-car.position.y = 0.5;
+car.position.set(0, 0.5, 0);
 scene.add(car);
 
-// Camera position
+// ===== CAMERA POSITION =====
 camera.position.set(0, 3, 6);
 camera.lookAt(car.position);
 
-// ===== TOUCH CONTROL =====
+// ===== CONTROL VARIABLES =====
 let targetX = 0;
+let speed = 0;
+let isTouching = false;
 
-window.addEventListener("touchmove", e => {
-  targetX = (e.touches[0].clientX / window.innerWidth - 0.5) * 6;
+// ===== TOUCH CONTROLS =====
+window.addEventListener("touchstart", () => {
+  isTouching = true;
+  speed = 0.25;
+});
+
+window.addEventListener("touchend", () => {
+  isTouching = false;
+  speed = 0;
+});
+
+window.addEventListener("touchmove", (e) => {
+  targetX = (e.touches[0].clientX / window.innerWidth - 0.5) * 4;
 });
 
 // ===== ANIMATION LOOP =====
 function animate() {
   requestAnimationFrame(animate);
 
-  // Left / Right movement
+  // Left / Right smooth movement
   car.position.x += (targetX - car.position.x) * 0.1;
 
-  // Forward movement
-  car.position.z -= 0.25;
+  // Road boundary (water me jane se roke)
+  if (car.position.x > 2) car.position.x = 2;
+  if (car.position.x < -2) car.position.x = -2;
+
+  // Forward movement ONLY on touch
+  if (isTouching) {
+    car.position.z -= speed;
+  }
 
   // Slope height logic
   if (car.position.z < -100 && car.position.z > -130) {
@@ -106,7 +130,7 @@ function animate() {
     car.position.y = 0.5;
   }
 
-  // Endless loop
+  // Endless road loop
   if (car.position.z < -180) {
     car.position.z = 0;
   }
@@ -121,7 +145,7 @@ function animate() {
 
 animate();
 
-// Resize
+// ===== RESIZE =====
 window.addEventListener("resize", () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
